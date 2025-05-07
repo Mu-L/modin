@@ -222,7 +222,9 @@ class QueryCompilerCaster(ABC):
         pass
 
     @abstractmethod
-    def set_backend(self, backend: str, inplace: bool) -> Optional[Self]:
+    def set_backend(
+        self, backend: str, inplace: bool, *, switch_operation: Optional[str] = None
+    ) -> Optional[Self]:
         """
         Set the backend of this object.
 
@@ -231,8 +233,12 @@ class QueryCompilerCaster(ABC):
         backend : str
             The new backend.
 
-        inplace : bool, default False
+        inplace : bool, default: False
             Whether to update the object in place.
+
+        switch_operation : Optional[str], default: None
+            The name of the operation that triggered the set_backend call.
+            Internal argument used for displaying progress bar information.
 
         Returns
         -------
@@ -463,7 +469,11 @@ def _maybe_switch_backend_pre_op(
             and arg.get_backend() != result_backend
         ):
             return arg
-        arg.set_backend(result_backend, inplace=True)
+        arg.set_backend(
+            result_backend,
+            inplace=True,
+            switch_operation=f"{class_of_wrapped_fn}.{function_name}",
+        )
         return arg
 
     return result_backend, cast_to_qc
@@ -538,7 +548,8 @@ def _maybe_switch_backend_post_op(
                 class_of_wrapped_fn=class_of_wrapped_fn,
                 function_name=function_name,
                 arguments=arguments,
-            )
+            ),
+            switch_operation=f"{class_of_wrapped_fn}.{function_name}",
         )
     return result
 
@@ -923,7 +934,9 @@ def wrap_function_in_argument_caster(
                     and arg.get_backend() != result_backend
                 ):
                     return arg
-                cast = arg.set_backend(result_backend)
+                cast = arg.set_backend(
+                    result_backend, switch_operation=f"{class_of_wrapped_fn}.{name}"
+                )
                 inplace_update_trackers.append(
                     InplaceUpdateTracker(
                         input_castable=arg,
